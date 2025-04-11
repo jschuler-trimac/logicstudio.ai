@@ -6,3 +6,5 @@
 
 /uploads/*
 !/uploads/placeholder.txt
+.idea
+.iml

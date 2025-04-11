@@ -1,0 +1,36 @@
+name: dev-deploy-logicstudio-app
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_APP_REGION_DEV }}
+          role-to-assume: ${{ secrets.AWS_ASSUME_ROLE_DEV }}
+          role-duration-seconds: 1200
+          role-session-name: trimac-github-action
+          role-skip-session-tagging: true
+      - name: Create NPMRC
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUBACTIONS_ADMIN_TOKEN }}" >> ~/.npmrc
+          echo "@trimac-ux:registry=https://npm.pkg.github.com" >> ~/.npmrc
+      - uses: actions/setup-node@v1
+        name: setup node version
+        with:
+          node-version: 18.x
+      - name: Build React App
+        run: npm ci && npm run build:webpack
+      - name: Deploy app build to S3 bucket
+        run: aws s3 sync ./dist/ s3://trimac-dev-us-west-2-spa-logicstudio-app --delete
+      - name: Invalidate the CF
+        run: aws cloudfront create-invalidation --distribution-id EO645W22V4XC7 --paths "/*"
